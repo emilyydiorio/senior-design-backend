@@ -4,9 +4,19 @@ const cors = require("cors");
 const { parse } = require("csv-parse/sync");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+const { Pool } = require("pg");
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
 
 app.use(cors());
+app.use(express.json());
 
 function formatDateForNyiso(date) {
   const year = date.getFullYear();
@@ -76,4 +86,44 @@ app.get("/api/lbmp", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+app.post("/api/power-readings", async (req, res) => {
+  try {
+    const { device_id, voltage, current, power, energy } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO power_readings (device_id, voltage, current, power, energy)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [device_id, voltage, current, power, energy]
+    );
+
+    res.status(201).json({
+      message: "Reading saved",
+      reading: result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to save reading",
+      details: error.message
+    });
+  }
+});
+
+app.get("/api/power-readings", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM power_readings
+       ORDER BY created_at DESC
+       LIMIT 100`
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to load readings",
+      details: error.message
+    });
+  }
 });
