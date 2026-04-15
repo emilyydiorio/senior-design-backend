@@ -127,3 +127,23 @@ app.get("/api/power-readings", async (req, res) => {
     });
   }
 });
+
+app.get("/api/devices", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT device_id
+       FROM power_readings
+       WHERE device_id IS NOT NULL
+       ORDER BY device_id ASC`
+    );
+
+    const deviceIds = result.rows.map(row => row.device_id);
+
+    res.json(deviceIds);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to load device IDs",
+      details: error.message
+    });
+  }
+});
